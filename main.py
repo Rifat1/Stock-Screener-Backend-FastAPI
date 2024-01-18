@@ -1,4 +1,7 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi_limiter import FastAPILimiter
+from fastapi_limiter.depends import RateLimiter
+import redis.asyncio as redis
 from fastapi.openapi.models import OAuthFlows as OAuthFlowsModel
 from fastapi.openapi.models import OAuthFlowAuthorizationCode
 from fastapi.openapi.models import OAuthFlows
@@ -15,8 +18,26 @@ from models import Stock, StockDetail
 
 load_dotenv()
 
-app = FastAPI()
+# @asynccontextmanager
+# async def lifespan(_: FastAPI):
+#     redis_connection = redis.from_url("redis://localhost", encoding="utf8")
+#     await FastAPILimiter.init(redis_connection)
+#     yield
+#     await FastAPILimiter.close()
 
+
+
+app = FastAPI()
+ 
+async def startup_event():
+    redis_connection = redis.from_url("redis://localhost", encoding="utf8")
+    await FastAPILimiter.init(redis_connection)
+
+async def shutdown_event():
+    await FastAPILimiter.close()
+
+app.add_event_handler("startup", startup_event)
+app.add_event_handler("shutdown", shutdown_event)
 
 async def get_mongo_db():
     mongo_uri = f"mongodb+srv://{os.environ['MONGO_USERNAME']}:{os.environ['MONGO_PASSWORD']}@{os.environ['MONGODB_CLUSTER']}/{os.environ['DATABASE_NAME']}?retryWrites=true&w=majority"
@@ -28,13 +49,24 @@ async def get_mongo_db():
     client.close()
 
 
-@app.get("/")
+
+
+@app.get("/", dependencies=[Depends(RateLimiter(times=2, seconds=5))])
 def read_root():
     return {"message": "Welcome to the homepage"}
 
 
-@app.get("/Stocks/US_S&P500", response_model=list[Stock])
-async def get_all_stocks(db: AsyncIOMotorClient = Depends(get_mongo_db)):
+
+
+@app.get("/Stocks/US_S&P500", response_model=list[Stock], dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=30, hours=24))])
+async def get_stocks(
+    page: int = Query(1, ge=1),  # Default page is 1
+    page_size: int = Query(20, ge=5, le=40),  # Default page size is 20, limit to 40
+    db: AsyncIOMotorClient = Depends(get_mongo_db)
+):
+    skip = (page - 1) * page_size
+    limit = page_size
+
     projection = {
         '_id': 0,       # Exclude the '_id' field
         'AnnualIncomeStatements': 0,
@@ -42,7 +74,8 @@ async def get_all_stocks(db: AsyncIOMotorClient = Depends(get_mongo_db)):
         'QuarterlyIncomeStatements': 0,
         'QuarterlyBalanceSheets': 0,
     }
-    stocks = await db.find({}, projection=projection).to_list(length=None)
+    # Modify the query to include a sort operation on the 'ROE' field in descending order
+    stocks = await db.find({}, projection=projection).sort("MarketCap_Billions", -1).skip(skip).limit(limit).to_list(length=None)
 
     # Convert ObjectId to string in each document
     stocks = [ {**stock} for stock in stocks ]
@@ -61,7 +94,9 @@ async def get_all_stocks(db: AsyncIOMotorClient = Depends(get_mongo_db)):
 
 
 
-@app.get("/Stocks/US_S&P500/{symbol}", response_model=StockDetail)
+
+
+@app.get("/Stocks/US_S&P500/{symbol}", response_model=StockDetail, dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=30, hours=24))])
 async def get_stock_by_symbol(
     symbol: str, db: AsyncIOMotorClient = Depends(get_mongo_db)
 ):
