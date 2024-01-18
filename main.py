@@ -1,77 +1,85 @@
-from typing import List
-from fastapi import FastAPI, HTTPException
-import asyncio
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.openapi.models import OAuthFlows as OAuthFlowsModel
+from fastapi.openapi.models import OAuthFlowAuthorizationCode
+from fastapi.openapi.models import OAuthFlows
 from motor.motor_asyncio import AsyncIOMotorClient
+from fastapi.responses import JSONResponse
+from bson import ObjectId, json_util
+import json
+from fastapi.encoders import jsonable_encoder
 from dotenv import load_dotenv
 import os
+import ssl
+import certifi
+from models import Stock, StockDetail
 
 load_dotenv()
 
 app = FastAPI()
 
-mongo_uri = f"mongodb+srv://{os.environ['MONGO_USERNAME']}:{os.environ['MONGO_PASSWORD']}@{os.environ['MONGODB_CLUSTER']}/{os.environ['DATABASE_NAME']}?retryWrites=true&w=majority"
 
-class DatabaseManager:
-    def __init__(self):
-        self.db_client = None
-        self.db = None
-        self.collection = None
-    
-    async def initialize_database(self):
-        try:
-            self.db_client = AsyncIOMotorClient(mongo_uri, io_loop=asyncio.get_event_loop())
-            self.db = self.db_client[os.environ['DATABASE_NAME']]
-            self.collection = self.db['US_S&P500']
-        except Exception as e:
-            print(f"Error initializing database: {str(e)}")
+async def get_mongo_db():
+    mongo_uri = f"mongodb+srv://{os.environ['MONGO_USERNAME']}:{os.environ['MONGO_PASSWORD']}@{os.environ['MONGODB_CLUSTER']}/{os.environ['DATABASE_NAME']}?retryWrites=true&w=majority"
+    client = AsyncIOMotorClient(
+        mongo_uri
+    )
+    db = client.Stocks['US_S&P500']
+    yield db
+    client.close()
 
-    async def test_connection(self):
-        try:
-            db_client = AsyncIOMotorClient(mongo_uri, io_loop=asyncio.get_event_loop())
-            db = db_client[os.environ['DATABASE_NAME']] 
-            self.collection = db['US_S&P500'] 
-            result = await self.collection.count_documents.__call__({})
-            return f"Connected! Found {result} documents."
-        except Exception as e:
-            return f"Not Connected - Error: {e}"
-    @property
-    async def get_collection(self):
-        if not self.collection or self.db_client.is_closed:
-            await self.initialize_database()
-        return self.collection    
 
-database_manager = DatabaseManager()
-
-# db = db_client[os.environ['DATABASE_NAME']]
-# collection = db['US_S&P500']
-
-# Define a projection excluding the 'Annual Income Statements' field
-projection = {"Annual Income Statements": False, 'Annual Balance Sheets': False, 'Quarterly Income Statements': False, 'Quarterly Balance Sheets': False}
-
-@app.get("/healthz")
-async def read_root():
-    response = await database_manager.test_connection()
-    return {"message": response}
-
-@app.get("/", tags=["Home"])
+@app.get("/")
 def read_root():
-    return {
-        "message": "Welcome to Stock Screener!"
+    return {"message": "Welcome to the homepage"}
+
+
+@app.get("/Stocks/US_S&P500", response_model=list[Stock])
+async def get_all_stocks(db: AsyncIOMotorClient = Depends(get_mongo_db)):
+    projection = {
+        '_id': 0,       # Exclude the '_id' field
+        'AnnualIncomeStatements': 0,
+        'AnnualBalanceSheets': 0,
+        'QuarterlyIncomeStatements': 0,
+        'QuarterlyBalanceSheets': 0,
     }
+    stocks = await db.find({}, projection=projection).to_list(length=None)
+
+    # Convert ObjectId to string in each document
+    stocks = [ {**stock} for stock in stocks ]
+    
+    # Use jsonable_encoder to get a JSON-serializable representation
+    stocks_json = jsonable_encoder(stocks)
+
+    # Replace NaN and Infinity with strings
+    stock_json = json.dumps(stocks_json).replace("NaN", '"NaN"').replace("Infinity", '"Infinity"')
+
+    # Convert the JSON string to a Python object
+    stocks_dict = json.loads(stock_json)
+
+    # Return JSON response
+    return JSONResponse(content=stocks_dict, media_type="application/json")
 
 
-@app.get("/Stocks/US_S&P500", response_model=List[dict], tags=["Stocks"])
-async def read_stocks():
-    collection = await database_manager.get_collection
-    cursor = database_manager.collection.find(projection = projection)
-    return await cursor.to_list(length=None)
 
+@app.get("/Stocks/US_S&P500/{symbol}", response_model=StockDetail)
+async def get_stock_by_symbol(
+    symbol: str, db: AsyncIOMotorClient = Depends(get_mongo_db)
+):
+    stock = await db.find_one({"Symbol": symbol})
+    if stock:
+        # Create a StockDetail instance
+        stock_detail = StockDetail(**stock)
 
-@app.get("/Stocks/US_S&P500/{symbol}", response_model=dict, tags=["Stocks"])
-async def read_stock(symbol: str):
-    doc = await collection.find_one({"Symbol": symbol})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Stock not found.")
+        # Use jsonable_encoder to get a JSON-serializable representation
+        stock_dict = jsonable_encoder(stock_detail)
+
+        # Replace NaN and Infinity with strings
+        stock_json = json.dumps(stock_dict).replace("NaN", '"NaN"').replace("Infinity", '"Infinity"')
+
+        # Convert the JSON string to a Python object
+        stock_dict = json.loads(stock_json)
+
+        # Return a more readable JSON response
+        return stock_dict
     else:
-        del doc["_id"]
-        return doc
+        raise HTTPException(status_code=404, detail="Stock not found")
