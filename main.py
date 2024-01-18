@@ -30,7 +30,7 @@ load_dotenv()
 app = FastAPI()
  
 async def startup_event():
-    redis_connection = redis.from_url("redis://localhost", encoding="utf8")
+    redis_connection = redis.from_url("redis://redis:6379/0", encoding="utf8")
     await FastAPILimiter.init(redis_connection)
 
 async def shutdown_event():
