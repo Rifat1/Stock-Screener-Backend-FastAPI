@@ -39,6 +39,7 @@ async def shutdown_event():
 app.add_event_handler("startup", startup_event)
 app.add_event_handler("shutdown", shutdown_event)
 
+
 async def get_mongo_db():
     mongo_uri = f"mongodb+srv://{os.environ['MONGO_USERNAME']}:{os.environ['MONGO_PASSWORD']}@{os.environ['MONGODB_CLUSTER']}/{os.environ['DATABASE_NAME']}?retryWrites=true&w=majority"
     client = AsyncIOMotorClient(
