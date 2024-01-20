@@ -54,12 +54,12 @@ async def get_mongo_db():
 
 @app.get("/", dependencies=[Depends(RateLimiter(times=2, seconds=5))])
 def read_root():
-    return {"message": "Welcome to the homepage"}
+    return {"message": "Welcome to StockDat, an index based stock market screener"}
 
 
 
 
-@app.get("/Stocks/US_S&P500", response_model=list[Stock], dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=30, hours=24))])
+@app.get("/stocks/SP500", response_model=list[Stock], dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=30, hours=24))])
 async def get_stocks(
     page: int = Query(1, ge=1),  # Default page is 1
     page_size: int = Query(20, ge=5, le=40),  # Default page size is 20, limit to 40

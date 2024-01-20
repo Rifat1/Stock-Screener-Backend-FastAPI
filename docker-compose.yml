@@ -9,7 +9,13 @@ services:
       - redis
     environment:
       REDIS_URL: "redis://redis:6379/0"  
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:80"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
+      
   redis:
     image: "redis:latest"
     ports:

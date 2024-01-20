@@ -29,9 +29,6 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_PRIVATE_KEY }}
           script: |
-            echo "$PRIVATE_KEY_CONTENT" > /Users/abdurrahmanabulhossain/Documents/My-Projects/Stock-screener-app.pem
-            cat /Users/abdurrahmanabulhossain/Documents/My-Projects/Stock-screener-app.pem
-            ssh -i /Users/abdurrahmanabulhossain/Documents/My-Projects/Stock-screener-app.pem ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} "echo Test SSH"
 
             cd /home/ec2-user/Projects/Stock-Screener-Backend-FastAPI
             git pull origin main  # Update my code
