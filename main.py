@@ -75,8 +75,8 @@ def read_root():
 
 
 
-
-@app.get("/stocks/SP500", response_model=list[Stock], dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=30, hours=24))])
+# /stocks/SP500
+@app.get("/stocks/{index_name}", response_model=list[Stock], dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=3000, hours=24))])
 async def get_stocks(
     page: int = Query(1, ge=1),  # Default page is 1
     page_size: int = Query(20, ge=5, le=40),  # Default page size is 20, limit to 40
