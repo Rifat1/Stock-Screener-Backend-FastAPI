@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi_limiter import FastAPILimiter
 from fastapi_limiter.depends import RateLimiter
 import redis.asyncio as redis
@@ -16,18 +17,26 @@ import ssl
 import certifi
 from models import Stock, StockDetail
 
+
+
 load_dotenv()
 
-# @asynccontextmanager
-# async def lifespan(_: FastAPI):
-#     redis_connection = redis.from_url("redis://localhost", encoding="utf8")
-#     await FastAPILimiter.init(redis_connection)
-#     yield
-#     await FastAPILimiter.close()
-
-
-
 app = FastAPI()
+
+origins = [
+    "http://localhost",
+    "http://localhost:3000"
+    "http://localhost:8000",  # Example frontend URL
+    # Add other frontend URLs as needed
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods
+    allow_headers=["*"],  # Allow all HTTP headers
+)
  
 async def startup_event():
     redis_connection = redis.from_url("redis://redis:6379/0", encoding="utf8")
