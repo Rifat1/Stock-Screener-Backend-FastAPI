@@ -75,16 +75,46 @@ def read_root():
 
 
 
-# /stocks/SP500
-@app.get("/stocks/{index_name}", response_model=list[Stock], dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=3000, hours=24))])
+# # /stocks/SP500 with pagination
+# @app.get("/stocks/{index_name}", response_model=list[Stock], dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=3000, hours=24))])
+# async def get_stocks(
+#     page: int = Query(1, ge=1),  # Default page is 1
+#     page_size: int = Query(20, ge=5, le=40),  # Default page size is 20, limit to 40
+#     db: AsyncIOMotorClient = Depends(get_mongo_db)
+# ):
+#     skip = (page - 1) * page_size
+#     limit = page_size
+
+#     projection = {
+#         '_id': 0,       # Exclude the '_id' field
+#         'AnnualIncomeStatements': 0,
+#         'AnnualBalanceSheets': 0,
+#         'QuarterlyIncomeStatements': 0,
+#         'QuarterlyBalanceSheets': 0,
+#     }
+#     # Modify the query to include a sort operation on the 'ROE' field in descending order
+#     stocks = await db.find({}, projection=projection).sort("MarketCap_Billions", -1).skip(skip).limit(limit).to_list(length=None)
+
+#     # Convert ObjectId to string in each document
+#     stocks = [ {**stock} for stock in stocks ]
+    
+#     # Use jsonable_encoder to get a JSON-serializable representation
+#     stocks_json = jsonable_encoder(stocks)
+
+#     # Replace NaN and Infinity with strings
+#     stock_json = json.dumps(stocks_json).replace("NaN", '"NaN"').replace("Infinity", '"Infinity"')
+
+#     # Convert the JSON string to a Python object
+#     stocks_dict = json.loads(stock_json)
+
+#     # Return JSON response
+#     return JSONResponse(content=stocks_dict, media_type="application/json")
+
+# /stocks/SP500 without pagination
+@app.get("/stocks/{index_name}", response_model=list[Stock], dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=30, hours=24))])
 async def get_stocks(
-    page: int = Query(1, ge=1),  # Default page is 1
-    page_size: int = Query(20, ge=5, le=40),  # Default page size is 20, limit to 40
     db: AsyncIOMotorClient = Depends(get_mongo_db)
 ):
-    skip = (page - 1) * page_size
-    limit = page_size
-
     projection = {
         '_id': 0,       # Exclude the '_id' field
         'AnnualIncomeStatements': 0,
@@ -92,8 +122,8 @@ async def get_stocks(
         'QuarterlyIncomeStatements': 0,
         'QuarterlyBalanceSheets': 0,
     }
-    # Modify the query to include a sort operation on the 'ROE' field in descending order
-    stocks = await db.find({}, projection=projection).sort("MarketCap_Billions", -1).skip(skip).limit(limit).to_list(length=None)
+    # Modify the query to include a sort operation on the 'MarketCap_Billions' field in descending order
+    stocks = await db.find({}, projection=projection).sort("MarketCap_Billions", -1).to_list(length=None)
 
     # Convert ObjectId to string in each document
     stocks = [ {**stock} for stock in stocks ]
@@ -109,8 +139,6 @@ async def get_stocks(
 
     # Return JSON response
     return JSONResponse(content=stocks_dict, media_type="application/json")
-
-
 
 
 
