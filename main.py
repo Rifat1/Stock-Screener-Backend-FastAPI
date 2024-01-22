@@ -24,6 +24,8 @@ load_dotenv()
 app = FastAPI()
 
 origins = [
+    "http://www.stockdat.com:3000",
+    "https://www.stockdat.com:3000",
     "http://localhost",
     "http://localhost:3000",
     "https://localhost:3000",
