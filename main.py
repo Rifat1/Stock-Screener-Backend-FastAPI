@@ -70,7 +70,7 @@ async def get_mongo_db():
 
 
 
-@app.get("/", dependencies=[Depends(RateLimiter(times=2, seconds=5))])
+@app.get("/api", dependencies=[Depends(RateLimiter(times=2, seconds=5))])
 def read_root():
     return {"message": "Welcome to StockDat, an index based stock market screener"}
 
@@ -112,7 +112,7 @@ def read_root():
 #     return JSONResponse(content=stocks_dict, media_type="application/json")
 
 # /stocks/SP500 without pagination
-@app.get("/stocks/SP500", response_model=list[Stock], dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=30, hours=24))])
+@app.get("/api/stocks/SP500", response_model=list[Stock], dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=30, hours=24))])
 async def get_stocks(
     db: AsyncIOMotorClient = Depends(get_mongo_db)
 ):
@@ -143,7 +143,7 @@ async def get_stocks(
 
 
 
-@app.get("/stocks/US_S&P500/{symbol}", response_model=StockDetail, dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=30, hours=24))])
+@app.get("/api/stocks/US_S&P500/{symbol}", response_model=StockDetail, dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=30, hours=24))])
 async def get_stock_by_symbol(
     symbol: str, db: AsyncIOMotorClient = Depends(get_mongo_db)
 ):
