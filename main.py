@@ -76,7 +76,7 @@ def read_root():
 
 
 
-# # /stocks/SP500 with pagination
+# # /stocks/SP500 with pagination on the backend
 # @app.get("/stocks/{index_name}", response_model=list[Stock], dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=3000, hours=24))])
 # async def get_stocks(
 #     page: int = Query(1, ge=1),  # Default page is 1
