@@ -67,7 +67,7 @@ async def get_mongo_db():
     client = AsyncIOMotorClient(
         mongo_uri
     )
-    db = client.Stocks['US_S&P500']
+    db = client.Stocks
     yield db
     client.close()
 
@@ -116,9 +116,9 @@ def read_root():
 #     return JSONResponse(content=stocks_dict, media_type="application/json")
 
 # /stocks/SP500 without pagination
-@app.get("/api/stocks/SP500", response_model=list[Stock], dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=30, hours=24))])
+@app.get("/api/stocks/{collection_name}", response_model=list[Stock], dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=30, hours=24))])
 async def get_stocks(
-    db: AsyncIOMotorClient = Depends(get_mongo_db)
+    collection_name: str, db: AsyncIOMotorClient = Depends(get_mongo_db)
 ):
     projection = {
         '_id': 0,       # Exclude the '_id' field
@@ -128,8 +128,10 @@ async def get_stocks(
         'QuarterlyBalanceSheets': 0,
     }
     # Modify the query to include a sort operation on the 'MarketCap_Billions' field in descending order
-    stocks = await db.find({}, projection=projection).sort("MarketCap_Billions", -1).to_list(length=None)
-
+    stocks = await db[collection_name].find({}, projection=projection).sort("MarketCap_Billions", -1).to_list(length=None)
+    if not stocks:
+        raise HTTPException(status_code=404, detail="Stocks not found")
+    
     # Convert ObjectId to string in each document
     stocks = [ {**stock} for stock in stocks ]
     
@@ -147,25 +149,26 @@ async def get_stocks(
 
 
 
-@app.get("/api/stocks/SP500/{symbol}", response_model=StockDetail, dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=30, hours=24))])
+@app.get("/api/stocks/{collection_name}/{symbol}", response_model=StockDetail, dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=20, hours=24))])
 async def get_stock_by_symbol(
-    symbol: str, db: AsyncIOMotorClient = Depends(get_mongo_db)
+    collection_name: str , symbol: str, db: AsyncIOMotorClient = Depends(get_mongo_db)
 ):
-    stock = await db.find_one({"Symbol": symbol})
-    if stock:
-        # Create a StockDetail instance
-        stock_detail = StockDetail(**stock)
-
-        # Use jsonable_encoder to get a JSON-serializable representation
-        stock_dict = jsonable_encoder(stock_detail)
-
-        # Replace NaN and Infinity with strings
-        stock_json = json.dumps(stock_dict).replace("NaN", '"NaN"').replace("Infinity", '"Infinity"')
-
-        # Convert the JSON string to a Python object
-        stock_dict = json.loads(stock_json)
-
-        # Return a more readable JSON response
-        return stock_dict
-    else:
+    stock = await db[collection_name].find_one({"Symbol": symbol})
+    if not stock:
         raise HTTPException(status_code=404, detail="Stock not found")
+    
+    # Create a StockDetail instance
+    stock_detail = StockDetail(**stock)
+
+    # Use jsonable_encoder to get a JSON-serializable representation
+    stock_dict = jsonable_encoder(stock_detail)
+
+    # Replace NaN and Infinity with strings
+    stock_json = json.dumps(stock_dict).replace("NaN", '"NaN"').replace("Infinity", '"Infinity"')
+
+    # Convert the JSON string to a Python object
+    stock_dict = json.loads(stock_json)
+
+    # Return a more readable JSON response
+    return stock_dict
+    
