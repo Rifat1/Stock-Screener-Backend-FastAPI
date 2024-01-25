@@ -147,7 +147,7 @@ async def get_stocks(
 
 
 
-@app.get("/api/stocks/US_S&P500/{symbol}", response_model=StockDetail, dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=30, hours=24))])
+@app.get("/api/stocks/SP500/{symbol}", response_model=StockDetail, dependencies=[Depends(RateLimiter(times=2, seconds=5)), Depends(RateLimiter(times=30, hours=24))])
 async def get_stock_by_symbol(
     symbol: str, db: AsyncIOMotorClient = Depends(get_mongo_db)
 ):
